@@ -13,6 +13,7 @@ const port = Number(process.env.PORT || 3001);
 const userAgent = 'SolanaFeeScanner/1.0';
 // Promo-style wording ("0 withdrawal fees across all chains") is how exchanges announce these campaigns.
 const queries = [
+  'zero withdrawal fee USDT USDC Solana network',
   'zero withdrawal fee USDT Solana',
   'free withdrawal USDC Solana',
   '"0 withdrawal fees" exchange',
@@ -86,7 +87,7 @@ async function bingNewsSearch(query) {
   });
 }
 
-const blueskyQueries = ['zero withdrawal fees', '0 withdrawal fees', 'free withdrawals', 'free withdrawal usdt', 'free withdrawal usdc', 'solana withdrawal fee', 'no withdrawal fees'];
+const blueskyQueries = ['zero withdrawal fee solana', 'zero withdrawal fees', '0 withdrawal fees', 'free withdrawals', 'free withdrawal usdt', 'free withdrawal usdc', 'solana withdrawal fee', 'no withdrawal fees'];
 async function blueskySearch(query) {
   const url = new URL('https://api.bsky.app/xrpc/app.bsky.feed.searchPosts');
   url.searchParams.set('q', query);
@@ -113,9 +114,11 @@ function classify(item) {
   if (item.app && !apps.includes(item.app)) apps.unshift(item.app);
   const promo = promoWindow(`${text} ${item.body || ''}`, item.date);
   const score = (zeroFee ? 3 : 0) + (solana ? 2 : allChains ? 1 : 0) + (stablecoin ? 1 : 0) + (apps.length ? 1 : 0) + (promo.ended ? -2 : 0);
+  // The exact target: free USDT/USDC withdrawals that cover Solana ("all chains" promos include it).
+  const exact = zeroFee && /\b(usdt|usdc)\b/i.test(text) && (solana || allChains);
   const strong = zeroFee && (solana || allChains) && apps.length > 0 && !promo.ended;
   const { body, ...rest } = item;
-  return { ...rest, tags: { zeroFee, solana, allChains, stablecoin }, apps, score, strong, promo };
+  return { ...rest, tags: { zeroFee, solana, allChains, stablecoin, exact }, apps, score: score + (exact ? 3 : 0), strong, promo };
 }
 
 // Keeps crypto zero-fee claims, plus fee/withdrawal news that mentions Solana or a stablecoin.

@@ -16,6 +16,7 @@
 .card-tags{display:flex;flex-wrap:wrap;gap:5px;margin:-4px 0 12px}.tag{font:8px var(--mono);letter-spacing:.6px;color:#9aa8b5;border:1px solid #24313b;border-radius:3px;padding:3px 6px}.tag-zero{color:var(--green);border-color:#2f5546}.tag-strong{color:#0a1712;background:var(--green);border-color:var(--green)}.tag-app{color:#c4cdf5;border-color:#2c3550}.tag-app.is-tried{color:#d9a37f;border-color:#5a3f2f}
 .exchange-blogs-icon{background:#2a2414;color:#f2c76b}.source-badge.exchange-blogs{color:#f2c76b;background:#2a2414}
 .tag-ended{color:#e39a8a;border-color:#5a332c}.tag-live{color:#0a1712;background:#f2c76b;border-color:#f2c76b}.tag-old{color:#c9a978;border-color:#4d4230}
+.tag-exact{color:#0a1712;background:#a586f6;border-color:#a586f6;font-weight:500}
 .blog-status{font:9px var(--mono);color:#6e7c8a;margin:-6px 0 12px}
 @media(max-width:780px){.fee-table{grid-template-columns:1fr}.fee-head-extra{display:none}.panel-heading{flex-direction:column;align-items:flex-start}}
 

@@ -2,7 +2,7 @@
 
 // "Zero Fees on USDT Withdrawals", "0 withdrawal fees", "withdrawals are free", "zero gas fees on USDT".
 export function isZeroFeeClaim(text) {
-  if (/(\bzero|\b0|\bno|\bfree|fee-free|\bwaived?)[\s-]+([a-z$]+[\s-]+){0,3}withdraw/i.test(text)) return true;
+  if (/(\bzero|\b0|\bno|\bfree|fee-free|\bwaived?)[\s-]+([a-z$&]+[\s-]+){0,4}withdraw/i.test(text)) return true;
   if (/withdraw\w*[\s-]+([a-z]+[\s-]+){0,3}(free|waived|0 fees?|zero fees?)/i.test(text)) return true;
   // Gas/network fee wording, as long as it is about moving stablecoins rather than trading them.
   return /(\bzero|\b0|\bno|\bfree)[\s-]+(gas[\s-]+|network[\s-]+|transfer[\s-]+)?fees?\b/i.test(text)
