@@ -7,7 +7,7 @@ export function isZeroFeeClaim(text) {
   // Gas/network fee wording, as long as it is about moving stablecoins rather than trading them.
   return /(\bzero|\b0|\bno|\bfree)[\s-]+(gas[\s-]+|network[\s-]+|transfer[\s-]+)?fees?\b/i.test(text)
     && /\b(usdt|usdc)\b/i.test(text)
-    && !/\b(trading|spot|futures|maker|taker)\b/i.test(text);
+    && !/\b(trading|spot|futures|maker|taker|deposits?)\b/i.test(text);
 }
 
 const months = 'jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?';

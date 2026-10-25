@@ -272,8 +272,12 @@ app.get('/api/search', async (_req, res) => {
   if (process.env.ENABLE_X === 'true') sources.push({ name: 'X', run: xSearch });
   if (process.env.ENABLE_REDDIT === 'true') sources.push({ name: 'Reddit', run: () => runQueries(queries, redditSearch) });
 
+  const runs = sources.map((source) => source.run());
+  // Read the blog status at the same moment the cached blog results were read, so a scan that
+  // finishes mid-request still reports "scanning" and the dashboard asks again.
+  const blogs = blogScanReport();
   const [settled, board] = await Promise.all([
-    Promise.allSettled(sources.map((source) => source.run())),
+    Promise.allSettled(runs),
     feeBoard().then((value) => ({ value }), (error) => ({ error })),
   ]);
   const results = [];
@@ -293,7 +297,7 @@ app.get('/api/search', async (_req, res) => {
     }
   });
   results.sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
-  res.json({ results, errors, feeBoard: board.value || null, blogs: blogScanReport(), checkedAt: new Date().toISOString(), queries, enabledSources: sources.map((source) => source.name) });
+  res.json({ results, errors, feeBoard: board.value || null, blogs, checkedAt: new Date().toISOString(), queries, enabledSources: sources.map((source) => source.name) });
 });
 
 if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {

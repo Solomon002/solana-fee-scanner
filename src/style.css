@@ -16,6 +16,13 @@
 .card-tags{display:flex;flex-wrap:wrap;gap:5px;margin:-4px 0 12px}.tag{font:8px var(--mono);letter-spacing:.6px;color:#9aa8b5;border:1px solid #24313b;border-radius:3px;padding:3px 6px}.tag-zero{color:var(--green);border-color:#2f5546}.tag-strong{color:#0a1712;background:var(--green);border-color:var(--green)}.tag-app{color:#c4cdf5;border-color:#2c3550}.tag-app.is-tried{color:#d9a37f;border-color:#5a3f2f}
 .exchange-blogs-icon{background:#2a2414;color:#f2c76b}.source-badge.exchange-blogs{color:#f2c76b;background:#2a2414}
 .tag-ended{color:#e39a8a;border-color:#5a332c}.tag-live{color:#0a1712;background:#f2c76b;border-color:#f2c76b}.tag-old{color:#c9a978;border-color:#4d4230}
+.apps-board{padding:24px 0;border-bottom:1px solid var(--line)}.apps-note{font-size:12px;line-height:1.6;color:#8b98a5;margin:-4px 0 14px;max-width:720px}.apps-note b{color:#c5b3fa;font-weight:600}
+.apps-list{display:flex;flex-direction:column;border-top:1px solid #18222b}.app-row{display:grid;grid-template-columns:170px 170px 190px minmax(0,1fr);align-items:center;gap:14px;padding:10px 6px;border-bottom:1px solid #18222b}.app-row.selected{background:#101b18}
+.app-name{display:flex;align-items:center;border:0;background:none;color:#e3eaf0;font:600 13px 'DM Sans';cursor:pointer;padding:0;text-align:left}.app-name:hover b{color:var(--green)}
+.app-status{justify-self:start;font:8px var(--mono);letter-spacing:.7px;padding:4px 7px;border-radius:3px;border:1px solid #2a3540;color:#8f9ca9;white-space:nowrap}
+.status-live .app-status,.status-board .app-status{color:#0a1712;background:var(--green);border-color:var(--green)}.status-past .app-status{color:#0a1712;background:#a586f6;border-color:#a586f6}.status-claim .app-status{color:#e7c27a;border-color:#4d4230}
+.app-fees{font:10px var(--mono);color:#8b98a5}.app-evidence{display:flex;flex-direction:column;gap:2px;min-width:0;text-decoration:none;color:#c9d3db;font-size:12px}.app-evidence span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.app-evidence small{font:9px var(--mono);color:#6e7c8a}.app-evidence:hover span{color:var(--green)}.app-evidence.muted{color:#5f6d7b;font-size:11px}
+@media(max-width:780px){.app-row{grid-template-columns:1fr auto;row-gap:6px}.app-fees{grid-column:1/-1}.app-evidence{grid-column:1/-1}}
 .tag-exact{color:#0a1712;background:#a586f6;border-color:#a586f6;font-weight:500}
 .blog-status{font:9px var(--mono);color:#6e7c8a;margin:-6px 0 12px}
 @media(max-width:780px){.fee-table{grid-template-columns:1fr}.fee-head-extra{display:none}.panel-heading{flex-direction:column;align-items:flex-start}}

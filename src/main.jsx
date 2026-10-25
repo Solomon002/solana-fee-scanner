@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './style.css';
 
@@ -73,24 +73,67 @@ function FeeBoard({ board, onPick }) {
   </section>;
 }
 
-function SpottedApps({ results, active, onPick }) {
-  const apps = useMemo(() => {
-    const counts = new Map();
-    for (const item of results) for (const name of item.apps || []) {
-      const entry = counts.get(name) || { name, count: 0, zeroFee: 0, latest: 0 };
-      entry.count += 1;
-      if (item.tags?.zeroFee) entry.zeroFee += 1;
-      entry.latest = Math.max(entry.latest, Date.parse(item.date) || 0);
-      counts.set(name, entry);
+// Status of an app, strongest evidence first. Lower rank sorts higher in the list.
+const appStatuses = {
+  live: { rank: 0, label: 'FREE NOW · PROMO', note: 'A zero-fee USDT/USDC on Solana promo that may still be running' },
+  board: { rank: 1, label: 'FREE NOW · FEE BOARD', note: 'Fee board shows $0 for USDT/USDC on Solana right now' },
+  past: { rank: 2, label: 'DID IT BEFORE', note: 'Ran a zero-fee USDT/USDC on Solana promo before; watch for the next one' },
+  claim: { rank: 3, label: 'ZERO-FEE POSTS', note: 'Zero-fee withdrawal posts, not confirmed for USDT/USDC on Solana' },
+  cheap: { rank: 4, label: 'CHEAPEST FEE', note: 'Not free, but among the cheapest on the fee board' },
+};
+
+function buildApps(results, board) {
+  const apps = new Map();
+  const get = (name) => {
+    if (!apps.has(name)) apps.set(name, { name, status: null, evidence: null, posts: 0, usdt: null, usdc: null });
+    return apps.get(name);
+  };
+  const promote = (app, status, evidence) => {
+    if (!app.status || appStatuses[status].rank < appStatuses[app.status].rank) { app.status = status; app.evidence = evidence; return; }
+    // Same status: keep the newest post as evidence.
+    if (status === app.status && evidence && (Date.parse(evidence.date) || 0) > (Date.parse(app.evidence?.date) || 0)) app.evidence = evidence;
+  };
+  for (const row of board?.rows || []) {
+    if (row.coin === 'SOL') continue;
+    const app = get(row.exchange);
+    app[row.coin.toLowerCase()] = row.feeUsd;
+    if (row.feeUsd === 0) promote(app, 'board', null);
+  }
+  for (const item of results) {
+    if (!item.tags?.zeroFee) continue;
+    for (const name of item.apps || []) {
+      const app = get(name);
+      app.posts += 1;
+      if (item.tags.exact) promote(app, item.promo?.ended || item.promo?.stale ? 'past' : 'live', item);
+      else if (item.tags.stablecoin || item.tags.solana || item.tags.allChains) promote(app, 'claim', item);
     }
-    return [...counts.values()].sort((a, b) => b.zeroFee - a.zeroFee || b.latest - a.latest);
-  }, [results]);
-  if (!apps.length) return null;
-  return <section className="spotted">
-    <div className="panel-heading"><div><span className="section-kicker">APPS SPOTTED IN ZERO-FEE POSTS</span><h2>Who is being talked about</h2></div></div>
-    <div className="app-chips">{apps.map((app) => <button key={app.name} className={`app-chip ${active === app.name ? 'selected' : ''} ${triedApps.has(app.name) ? 'is-tried' : ''}`} onClick={() => onPick(active === app.name ? '' : app.name)}>
-      <b>{app.name}</b><span>{app.zeroFee}/{app.count} zero-fee</span>{triedApps.has(app.name) && <em className="tried">TRIED</em>}
-    </button>)}</div>
+  }
+  const cheapest = (app) => Math.min(app.usdt ?? Infinity, app.usdc ?? Infinity);
+  const listed = [...apps.values()];
+  // Without zero-fee evidence, only the five cheapest fee-board exchanges are worth showing.
+  listed.filter((app) => !app.status && Number.isFinite(cheapest(app))).sort((a, b) => cheapest(a) - cheapest(b)).slice(0, 5).forEach((app) => { app.status = 'cheap'; });
+  return listed.filter((app) => app.status).sort((a, b) => appStatuses[a.status].rank - appStatuses[b.status].rank
+    || (Date.parse(b.evidence?.date) || 0) - (Date.parse(a.evidence?.date) || 0)
+    || cheapest(a) - cheapest(b));
+}
+
+function AppsBoard({ results, board, scanning, active, onPick }) {
+  const apps = useMemo(() => buildApps(results, board), [results, board]);
+  const liveCount = apps.filter((app) => app.status === 'live' || app.status === 'board').length;
+  return <section className="apps-board">
+    <div className="panel-heading"><div><span className="section-kicker">APPS · ZERO-FEE USDT/USDC ON SOLANA</span><h2>Which app to use</h2></div>
+      <span className={`free-count ${liveCount ? 'has-free' : ''}`}>{liveCount ? `${liveCount} FREE RIGHT NOW` : 'NONE FREE RIGHT NOW'}</span></div>
+    {!liveCount && <p className="apps-note">No app is confirmed free for USDT/USDC on Solana at the moment. The ones marked <b>DID IT BEFORE</b> have run this exact promo, so they are the ones to watch.{scanning ? ' Still scanning exchange blogs, more apps will appear in about a minute.' : ''}</p>}
+    <div className="apps-list">{apps.map((app) => <div key={app.name} className={`app-row status-${app.status} ${active === app.name ? 'selected' : ''}`}>
+      <button className="app-name" onClick={() => onPick(active === app.name ? '' : app.name)} title={`Show posts mentioning ${app.name}`}>
+        <b>{app.name}</b>{triedApps.has(app.name) && <em className="tried">TRIED</em>}
+      </button>
+      <span className="app-status" title={appStatuses[app.status].note}>{appStatuses[app.status].label}</span>
+      <span className="app-fees">{app.usdt !== null || app.usdc !== null ? <>USDT {formatFee(app.usdt)} · USDC {formatFee(app.usdc)}</> : 'Fee not listed'}</span>
+      {app.evidence ? <a className="app-evidence" href={app.evidence.url} target="_blank" rel="noreferrer">
+        <span>{app.evidence.title}</span><small>{relativeDate(app.evidence.date)}{app.evidence.promo?.ended ? ` · ended ${shortDate(app.evidence.promo.endsAt)}` : ''}</small>
+      </a> : <span className="app-evidence muted">{app.status === 'board' ? 'Listed as free on withdrawalfees.com' : 'No zero-fee post found yet'}</span>}
+    </div>)}</div>
   </section>;
 }
 
@@ -108,6 +151,7 @@ function App() {
   const [sort, setSort] = useState('exact');
   const [auto, setAuto] = useState(true);
   const [nextRefresh, setNextRefresh] = useState(30 * 60);
+  const blogPoll = useRef(null);
 
   const refresh = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -123,6 +167,9 @@ function App() {
       setQueries(data.queries || []);
       setUpdated(data.checkedAt || new Date().toISOString());
       setNextRefresh(30 * 60);
+      // A fresh server scans exchange blogs in the background; fetch again once that is likely done.
+      window.clearTimeout(blogPoll.current);
+      if (data.blogs?.scanning) blogPoll.current = window.setTimeout(() => refresh(true), 20000);
     } catch (error) {
       setErrors([{ source: 'Connection', message: error.message }]);
     } finally { setLoading(false); }
@@ -170,8 +217,8 @@ function App() {
         <div className="metric metric-updated"><span className="metric-label">LAST SCAN</span><strong className="updated-time">{updated ? new Date(updated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</strong><span className="metric-note"><Icon name="clock" size={14}/> {updated ? relativeDate(updated) : 'Waiting for scan'}</span></div>
         <button className={`refresh-button ${loading ? 'is-loading' : ''}`} onClick={() => refresh()} disabled={loading}><Icon name="refresh" size={16}/><span>{loading ? 'SCANNING' : 'REFRESH NOW'}</span></button>
       </section>
+      <AppsBoard results={results} board={board} scanning={Boolean(blogs?.scanning)} active={keyword} onPick={(name) => { setKeyword(name); if (name) setSort('best'); }}/>
       <FeeBoard board={board} onPick={setKeyword}/>
-      <SpottedApps results={results} active={keyword} onPick={setKeyword}/>
       <section className="toolbar" aria-label="Filter results">
         <div className="toolbar-left"><span className="filter-label">FILTER BY</span><div className="segmented">{['All sources', ...sources].map((item) => <button key={item} className={source === item ? 'selected' : ''} onClick={() => setSource(item)}>{item}</button>)}</div></div>
         <label className="keyword-search"><Icon name="search" size={17}/><input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="Search keywords..." aria-label="Search keywords"/>{keyword && <button className="clear-search" onClick={() => setKeyword('')} aria-label="Clear search">×</button>}</label>
@@ -182,7 +229,7 @@ function App() {
         {blogs && <p className="blog-status">{blogs.scanning ? `Exchange blogs: scanning ${blogs.sites} exchange sitemaps in the background (about a minute). Refresh after that to see them.` : blogs.checkedAt ? `Exchange blogs: ${blogs.sites - blogs.failed.length}/${blogs.sites} sites checked ${relativeDate(blogs.checkedAt).toLowerCase()} · rechecked every 6 hours` : ''}</p>}
         {errors.length > 0 && <div className="error-banner"><span className="error-mark">!</span><div><strong>{errors.length === 1 && errors[0].source === 'Google' ? 'Google search is unavailable' : 'Some sources could not be reached'}</strong><p>{errors.map((e) => `${e.source}: ${e.message}`).join(' · ')}</p></div></div>}
         {loading && results.length === 0 ? <div className="loading-state"><span className="spinner"/><span>Scanning news &amp; social feeds<span className="loading-dots">...</span></span><small>This can take a few seconds</small></div>
-          : filtered.length === 0 ? <div className="empty-state"><span className="empty-icon"><Icon name="search" size={22}/></span><strong>{sort === 'exact' && results.length ? 'No zero-fee USDT/USDC on Solana posts right now' : results.length ? 'No results match your filters' : 'No mentions found yet'}</strong><p>{sort === 'exact' && results.length ? 'The scanner keeps checking every 30 minutes. Meanwhile, see related posts below.' : results.length ? 'Try another keyword or source.' : 'Run a refresh in a moment, or check your API configuration.'}</p>{sort === 'exact' && results.length > 0 && <button onClick={() => setSort('best')}>Show related posts</button>}{keyword && <button onClick={() => { setKeyword(''); setSource('All sources'); }}>Clear filters</button>}</div>
+          : filtered.length === 0 ? <div className="empty-state"><span className="empty-icon"><Icon name="search" size={22}/></span><strong>{sort === 'exact' && results.length ? 'No zero-fee USDT/USDC on Solana posts right now' : results.length ? 'No results match your filters' : 'No mentions found yet'}</strong><p>{sort === 'exact' && blogs?.scanning ? 'Still scanning exchange blogs; this page updates by itself in about a minute.' : sort === 'exact' && results.length ? 'The scanner keeps checking every 30 minutes. Meanwhile, see related posts below.' : results.length ? 'Try another keyword or source.' : 'Run a refresh in a moment, or check your API configuration.'}</p>{sort === 'exact' && results.length > 0 && <button onClick={() => setSort('best')}>Show related posts</button>}{keyword && <button onClick={() => { setKeyword(''); setSource('All sources'); }}>Clear filters</button>}</div>
           : <div className="cards">{filtered.map((item) => <article className="result-card" key={item.id}><div className="card-top"><span className={`source-badge ${sourceClass(item.source)}`}><i>{sourceMarks[item.source] || item.source[0]}</i>{item.source}</span><span className="result-date"><Icon name="clock" size={13}/>{relativeDate(item.date)}</span></div><h3><Highlight text={item.title}/></h3><p className="snippet"><Highlight text={item.snippet}/></p>{(item.tags?.zeroFee || item.tags?.solana || item.tags?.allChains || item.apps?.length > 0) && <div className="card-tags">{item.tags?.exact && <span className="tag tag-exact">EXACT: USDT/USDC · SOLANA</span>}{item.strong && <span className="tag tag-strong">STRONG LEAD</span>}<PromoTag promo={item.promo}/>{item.tags?.zeroFee && <span className="tag tag-zero">0-FEE CLAIM</span>}{item.tags?.solana ? <span className="tag">SOLANA</span> : item.tags?.allChains && <span className="tag">ALL CHAINS</span>}{(item.apps || []).map((name) => <span key={name} className={`tag tag-app ${triedApps.has(name) ? 'is-tried' : ''}`}>{name}{triedApps.has(name) ? ' · tried' : ''}</span>)}</div>}<div className="card-bottom"><span className="result-domain">{item.source === 'X' ? 'x.com' : (() => { try { return new URL(item.url).hostname.replace(/^www\./, ''); } catch { return 'web result'; } })()}</span><a href={item.url} target="_blank" rel="noreferrer" className="view-link">VIEW POST <Icon name="arrow" size={14}/></a></div></article>)}</div>}
       </section>
       <section className="query-strip"><div className="query-title"><span className="query-icon"><Icon name="spark" size={16}/></span><div><strong>ACTIVE SEARCH QUERIES</strong><small>Searching for fee-free stablecoin withdrawals</small></div></div><div className="query-list">{queries.map((q) => <span key={q}>{q}</span>)}</div></section>
